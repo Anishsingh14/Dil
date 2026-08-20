@@ -44,3 +44,5 @@ models/*.pkl
 
 # Docker
 .docker/
+
+.env

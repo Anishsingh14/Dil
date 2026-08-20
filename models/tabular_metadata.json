@@ -1,4 +1,6 @@
 {
+  "model_type": "XGBoost + Isotonic Calibration",
+  "model_version": "tabular-xgb-v1.1.0",
   "feature_cols": [
     "age",
     "sex",
@@ -14,9 +16,46 @@
     "ca",
     "thal"
   ],
-  "model_version": "tabular-mlp-v1.3.0",
-  "test_accuracy": 0.7540983606557377,
-  "test_recall": 0.8181818181818182,
-  "train_accuracy": 0.9793388429752066,
-  "train_recall": 0.9924242424242424
+  "feature_importance": {
+    "cp": 0.2156,
+    "thal": 0.1849,
+    "sex": 0.1013,
+    "ca": 0.0995,
+    "slope": 0.0784,
+    "oldpeak": 0.0659,
+    "exang": 0.0616,
+    "restecg": 0.0466,
+    "thalach": 0.0393,
+    "chol": 0.0364,
+    "age": 0.0363,
+    "trestbps": 0.0341,
+    "fbs": 0.0
+  },
+  "test_accuracy": 0.8361,
+  "test_recall": 0.9697,
+  "test_auc": 0.8772,
+  "train_accuracy": 0.9793,
+  "train_recall": 0.9773,
+  "train_auc": 0.9987,
+  "scale_pos_weight": 0.8333333333333334,
+  "xgb_params": {
+    "objective": "binary:logistic",
+    "eval_metric": ["logloss", "auc"],
+    "tree_method": "hist",
+    "max_depth": 5,
+    "learning_rate": 0.03,
+    "n_estimators": 800,
+    "subsample": 0.85,
+    "colsample_bytree": 0.85,
+    "colsample_bylevel": 0.85,
+    "min_child_weight": 2,
+    "gamma": 0.05,
+    "reg_alpha": 0.05,
+    "reg_lambda": 0.5,
+    "scale_pos_weight": 0.8333333333333334,
+    "random_state": 42,
+    "n_jobs": -1,
+    "verbosity": 1
+  },
+  "calibrated": true
 }

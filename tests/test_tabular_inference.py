@@ -84,7 +84,7 @@ async def test_predict_tabular_success(test_api_key, setup_database):
         assert "risk_score" in data
         assert 0.0 <= data["risk_score"] <= 1.0
         assert data["risk_level"] in ["Low Risk", "Moderate Risk", "High Risk"]
-        assert data["model_version"] == "tabular-mlp-v1.3.0"
+        assert data["model_version"] == "tabular-xgb-v1.1.0"
         assert "latency_ms" in data
         assert isinstance(data["latency_ms"], int)
         assert data["latency_ms"] >= 0

@@ -6,27 +6,23 @@ from typing import Optional
 
 import joblib
 import numpy as np
-import torch
-
-from models.train_tabular import TabularMLP
+import xgboost as xgb
 
 
 class TabularInferenceEngine:
     def __init__(
         self,
-        model_path: str = "models/tabular_mlp.pth",
+        model_path: str = "models/tabular_xgb.pkl",
         scaler_path: str = "models/scaler.joblib",
         metadata_path: str = "models/tabular_metadata.json",
-        device: Optional[str] = None,
     ):
         self.model_path = Path(model_path)
         self.scaler_path = Path(scaler_path)
         self.metadata_path = Path(metadata_path)
-        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-        self.model: Optional[TabularMLP] = None
+        self.model: Optional[xgb.XGBClassifier] = None
         self.scaler = None
         self.feature_cols = None
-        self.model_version = "tabular-mlp-v1.3.0"
+        self.model_version = "tabular-xgb-v1.1.0"
         self._loaded = False
 
     def load(self) -> None:
@@ -38,40 +34,36 @@ class TabularInferenceEngine:
         if not self.scaler_path.exists():
             raise FileNotFoundError(f"Scaler not found at {self.scaler_path}")
 
-        checkpoint = torch.load(self.model_path, map_location=self.device)
-        self.feature_cols = checkpoint.get("feature_cols", [
-            "age", "sex", "cp", "trestbps", "chol", "fbs",
-            "restecg", "thalach", "exang", "oldpeak", "slope", "ca", "thal"
-        ])
-        self.model_version = checkpoint.get("model_version", "tabular-mlp-v1.3.0")
-
-        self.model = TabularMLP(
-            input_dim=checkpoint.get("input_dim", 13),
-            hidden_dims=checkpoint.get("hidden_dims", [64, 32]),
-            dropout=checkpoint.get("dropout", 0.3),
-        ).to(self.device)
-        self.model.load_state_dict(checkpoint["model_state_dict"])
-        self.model.eval()
-
+        self.model = joblib.load(self.model_path)
         self.scaler = joblib.load(self.scaler_path)
 
         if self.metadata_path.exists():
             with open(self.metadata_path) as f:
                 metadata = json.load(f)
+                self.feature_cols = metadata.get("feature_cols", [
+                    "age", "sex", "cp", "trestbps", "chol", "fbs",
+                    "restecg", "thalach", "exang", "oldpeak", "slope", "ca", "thal"
+                ])
                 self.model_version = metadata.get("model_version", self.model_version)
+        else:
+            self.feature_cols = [
+                "age", "sex", "cp", "trestbps", "chol", "fbs",
+                "restecg", "thalach", "exang", "oldpeak", "slope", "ca", "thal"
+            ]
 
         self._loaded = True
-        print(f"Tabular model loaded on {self.device}: {self.model_version}")
+        print(f"Tabular model loaded: {self.model_version}")
 
     def _predict_sync(self, features: np.ndarray) -> tuple[float, str]:
         if not self._loaded:
             self.load()
 
         features_scaled = self.scaler.transform(features.reshape(1, -1))
-        features_tensor = torch.tensor(features_scaled, dtype=torch.float32).to(self.device)
-
-        with torch.no_grad():
-            risk_score = float(self.model(features_tensor).cpu().item())
+        
+        if hasattr(self.model, 'predict_proba'):
+            risk_score = float(self.model.predict_proba(features_scaled)[0, 1])
+        else:
+            risk_score = float(self.model.predict(features_scaled)[0])
 
         if risk_score < 0.33:
             risk_level = "Low Risk"
@@ -92,7 +84,7 @@ class TabularInferenceEngine:
         return self._loaded
 
     def get_device(self) -> str:
-        return str(self.device)
+        return "cpu"
 
 
 _tabular_engine: Optional[TabularInferenceEngine] = None
