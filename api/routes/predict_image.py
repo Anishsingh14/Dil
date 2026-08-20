@@ -1,5 +1,7 @@
 import time
 from datetime import datetime, timezone
+from pathlib import Path
+from typing import List, Optional
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Request, UploadFile, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,6 +24,19 @@ class ImageResponse(BaseModel):
     model_version: str
     latency_ms: int
     timestamp: str
+
+
+class ImageSeriesResponse(BaseModel):
+    status: str = "success"
+    risk_score: float
+    risk_level: str
+    modality: str
+    findings: dict
+    model_version: str
+    latency_ms: int
+    timestamp: str
+    num_images: int
+    individual_scores: List[float]
 
 
 class ErrorResponse(BaseModel):
@@ -86,6 +101,7 @@ async def predict_image(
     patient_ref: str | None = Form(None),
     developer: Developer = Depends(get_current_developer),
 ) -> ImageResponse:
+    """Single image prediction (backward compatible)."""
     if not validate_file_extension(file.filename or ""):
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
@@ -113,6 +129,84 @@ async def predict_image(
         model_version=engine.model_version,
         latency_ms=latency_ms,
         timestamp=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+    )
+
+
+@router.post(
+    "/predict-image-series",
+    response_model=ImageSeriesResponse,
+    responses={
+        401: {"model": ErrorResponse},
+        415: {"model": ErrorResponse},
+        429: {"model": ErrorResponse},
+    },
+)
+async def predict_image_series(
+    request: Request,
+    files: List[UploadFile] = File(...),
+    modality: str = Form(..., pattern="^(chest_xray|cardiac_mri)$"),
+    patient_ref: str | None = Form(None),
+    developer: Developer = Depends(get_current_developer),
+) -> ImageSeriesResponse:
+    """Multi-image series prediction (for cardiac MRI or multi-view chest X-rays)."""
+    if not files:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "status": "error",
+                "error_code": "NO_FILES_PROVIDED",
+                "detail": "At least one image file must be provided.",
+                "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            },
+        )
+    
+    if len(files) > 50:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "status": "error",
+                "error_code": "TOO_MANY_FILES",
+                "detail": "Maximum 50 images per series allowed.",
+                "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            },
+        )
+    
+    # Validate all files
+    for file in files:
+        if not validate_file_extension(file.filename or ""):
+            raise HTTPException(
+                status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                detail={
+                    "status": "error",
+                    "error_code": "UNSUPPORTED_FILE_TYPE",
+                    "detail": f"File extension '{Path(file.filename).suffix}' is not supported. Accepted types: .png, .jpg, .dicom",
+                    "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                },
+            )
+    
+    # Read all files
+    files_data = []
+    for file in files:
+        file_bytes = await file.read()
+        files_data.append((file_bytes, file.filename))
+    
+    engine = get_imaging_engine()
+    if not engine.is_loaded():
+        engine.load()
+    
+    # Process as series
+    risk_score, risk_level, findings, latency_ms, individual_scores = await engine.predict_series(files_data)
+
+    return ImageSeriesResponse(
+        risk_score=risk_score,
+        risk_level=risk_level,
+        modality=modality,
+        findings=findings,
+        model_version=engine.model_version,
+        latency_ms=latency_ms,
+        timestamp=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        num_images=len(files_data),
+        individual_scores=individual_scores,
     )
 
 

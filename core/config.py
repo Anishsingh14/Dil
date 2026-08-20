@@ -48,6 +48,9 @@ class Settings(BaseSettings):
     # CORS
     CORS_ALLOWED_ORIGINS: str = Field(default="http://localhost:8501")
 
+    # Graceful Shutdown
+    GRACEFUL_SHUTDOWN_TIMEOUT: int = Field(default=30)
+
 
 @lru_cache
 def get_settings() -> Settings:
