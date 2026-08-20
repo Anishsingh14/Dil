@@ -1,0 +1,25 @@
+# Code owners for review
+* @Anishsingh14
+
+# API routes
+/api/ @Anishsingh14
+
+# Database models and migrations
+/db/ @Anishsingh14
+
+# Core configuration and auth
+/core/ @Anishsingh14
+
+# ML models
+/models/ @Anishsingh14
+
+# Tests
+/tests/ @Anishsingh14
+
+# Documentation
+/docs/ @Anishsingh14
+
+# Docker and deployment
+/Dockerfile* @Anishsingh14
+/docker-compose* @Anishsingh14
+/.github/ @Anishsingh14
