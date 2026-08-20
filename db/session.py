@@ -2,17 +2,48 @@ from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 
 from db.models import Base
-
 from core.config import settings
 
 
-engine = create_async_engine(
-    settings.DATABASE_URL,
-    echo=settings.DB_ECHO,
-    future=True,
-)
+def create_engine():
+    """Create async engine with appropriate pooling for the database dialect."""
+    url = settings.DATABASE_URL
+    
+    if url.startswith("mysql") or url.startswith("mysql+aiomysql"):
+        # MySQL with aiomysql - use proper pooling
+        return create_async_engine(
+            url,
+            echo=settings.DB_ECHO,
+            future=True,
+            pool_size=settings.DB_POOL_SIZE,
+            max_overflow=settings.DB_MAX_OVERFLOW,
+            pool_pre_ping=settings.DB_POOL_PRE_PING,
+            pool_recycle=3600,
+        )
+    elif url.startswith("postgresql") or url.startswith("postgresql+asyncpg"):
+        # PostgreSQL with asyncpg
+        return create_async_engine(
+            url,
+            echo=settings.DB_ECHO,
+            future=True,
+            pool_size=settings.DB_POOL_SIZE,
+            max_overflow=settings.DB_MAX_OVERFLOW,
+            pool_pre_ping=settings.DB_POOL_PRE_PING,
+        )
+    else:
+        # SQLite - use NullPool to avoid threading issues
+        return create_async_engine(
+            url,
+            echo=settings.DB_ECHO,
+            future=True,
+            poolclass=NullPool,
+        )
+
+
+engine = create_engine()
 
 async_session_maker = async_sessionmaker(
     engine,

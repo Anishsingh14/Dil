@@ -1,9 +1,11 @@
 import secrets
 import bcrypt
 from typing import Optional
+from datetime import datetime, timezone, timedelta
 
 from db.models import APIKey, Developer
 from db.session import get_session
+from core.config import settings
 
 
 KEY_PREFIX_LENGTH = 12
@@ -43,23 +45,57 @@ def verify_api_key(raw_key: str, hashed_key: str) -> bool:
 async def create_api_key(
     developer_id: int,
     session,
+    expires_in_days: Optional[int] = None,
 ) -> tuple[str, APIKey]:
     """Create a new API key for a developer. Returns (raw_key, api_key_model)."""
     raw_key = generate_raw_key()
     key_prefix = extract_key_prefix(raw_key)
     hashed_key = hash_api_key(raw_key)
 
+    expires_at = None
+    if expires_in_days is None:
+        expires_in_days = settings.API_KEY_EXPIRATION_DAYS
+    if expires_in_days > 0:
+        expires_at = datetime.now(timezone.utc) + timedelta(days=expires_in_days)
+
     api_key = APIKey(
         developer_id=developer_id,
         key_prefix=key_prefix,
         hashed_key=hashed_key,
         is_active=True,
+        expires_at=expires_at,
     )
     session.add(api_key)
     await session.flush()
     await session.refresh(api_key)
 
     return raw_key, api_key
+
+
+def is_api_key_expired(api_key: APIKey) -> bool:
+    """Check if an API key has expired."""
+    if api_key.expires_at is None:
+        return False
+    # Ensure both datetimes are offset-aware for comparison
+    expires_at = api_key.expires_at
+    if expires_at.tzinfo is None:
+        # Assume UTC if no timezone info
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    return datetime.now(timezone.utc) > expires_at
+
+
+async def revoke_api_key(api_key_id: int, session) -> bool:
+    """Revoke an API key by setting is_active to False."""
+    from sqlalchemy import select
+    result = await session.execute(
+        select(APIKey).where(APIKey.id == api_key_id)
+    )
+    api_key = result.scalar_one_or_none()
+    if not api_key:
+        return False
+    api_key.is_active = False
+    await session.flush()
+    return True
 
 
 async def verify_api_key_and_get_developer(
@@ -83,6 +119,9 @@ async def verify_api_key_and_get_developer(
     api_key = result.scalar_one_or_none()
 
     if not api_key:
+        return None
+
+    if is_api_key_expired(api_key):
         return None
 
     if not verify_api_key(raw_key, api_key.hashed_key):
