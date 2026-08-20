@@ -14,6 +14,7 @@ from core.auth import verify_api_key_and_get_developer
 from db.session import init_db, get_db
 from api.routes import health, predict_tabular, predict_image
 from models.tabular_inference import initialize_tabular_model
+from models.imaging_inference import initialize_imaging_model
 from datetime import datetime, timezone
 
 
@@ -43,6 +44,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await init_db()
     await initialize_tabular_model()
+    await initialize_imaging_model()
     yield
 
 

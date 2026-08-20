@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from db.session import get_db
 from core.config import settings
 from models.tabular_inference import get_tabular_engine
+from models.imaging_inference import get_imaging_engine
 
 
 router = APIRouter(tags=["health"])
@@ -38,10 +39,13 @@ async def health_check(db: AsyncSession = Depends(get_db)) -> HealthResponse:
     tabular_model_status = "loaded" if tabular_engine.is_loaded() else "not_loaded"
     device = tabular_engine.get_device()
 
-    imaging_model_status = "not_loaded"
+    imaging_engine = get_imaging_engine()
+    if not imaging_engine.is_loaded():
+        imaging_engine.load()
+    imaging_model_status = "loaded" if imaging_engine.is_loaded() else "not_loaded"
 
     overall_status = "ok"
-    if db_status != "connected" or tabular_model_status != "loaded":
+    if db_status != "connected" or tabular_model_status != "loaded" or imaging_model_status != "loaded":
         overall_status = "degraded"
 
     return HealthResponse(
