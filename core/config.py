@@ -1,8 +1,32 @@
+"""Application configuration using Pydantic Settings."""
+
 from functools import lru_cache
 from typing import Optional
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from core.constants import (
+    DEFAULT_SQLITE_PATH,
+    DEFAULT_DB_POOL_SIZE,
+    DEFAULT_DB_MAX_OVERFLOW,
+    DEFAULT_DB_POOL_PRE_PING,
+    DEFAULT_DB_ECHO,
+    DEFAULT_REDIS_URL,
+    DEFAULT_TABULAR_MODEL_PATH,
+    DEFAULT_IMAGING_MODEL_PATH,
+    DEFAULT_SCALER_PATH,
+    DEFAULT_LOG_LEVEL,
+    DEFAULT_CORS_ORIGINS,
+    DEFAULT_GRACEFUL_SHUTDOWN_TIMEOUT,
+    DEFAULT_API_KEY_EXPIRATION_DAYS,
+    DEFAULT_RATE_LIMIT_REQUESTS,
+    DEFAULT_RATE_LIMIT_WINDOW_SECONDS,
+    DEFAULT_JWT_SECRET_KEY,
+    DEFAULT_JWT_ALGORITHM,
+    DEFAULT_JWT_EXPIRATION_HOURS,
+    DEFAULT_REDIS_URL,
+)
 
 
 class Settings(BaseSettings):
